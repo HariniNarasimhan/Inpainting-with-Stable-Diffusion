@@ -79,6 +79,29 @@ def get_prediction(img_path, confidence):
   pred_class = pred_class[:pred_t+1]
   return masks, pred_boxes, pred_class
 
+def mask_edge_smoothening(img):
+    try:
+      h,w = img.shape
+      for i in range(h-1):
+          find = np.where(img[i,:]==255)[0]
+
+          if len(find)>0:
+              min_loc = np.min(find)
+              max_loc = np.max(find)
+              # print(min_loc, max_loc, h,w)
+              img[i,max(0, min_loc-1)] = np.random.choice(np.arange(200,254),1)
+              img[i,min(w-1, max_loc+1)] = np.random.choice(np.arange(200,254),1)
+
+              img[i, max(0, min_loc-2)] = np.random.choice(np.arange(100,200),1)
+              img[i, min(w-1, max_loc+2)] = np.random.choice(np.arange(100,200),1)
+
+              img[i, max(0, min_loc-3)] = np.random.choice(np.arange(1,50),1)
+              img[i, min(w-1, max_loc+3)] = np.random.choice(np.arange(1,50),1)
+      return img
+    except Exception as e:
+      print(e)
+      return img
+
 
 class Detectobjects():
     def __init__(self, img_path):
@@ -103,8 +126,16 @@ class Detectobjects():
         cv2.imwrite(save_path, cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     def fetch_predictions(self, indices, save_path):
         result_masks= [self.masks[i] for i in range(len(self.masks)) if i not in indices ] 
-        combined_mask = np.clip(sum(result_masks), 0, 1)
-        cv2.imwrite(save_path, combined_mask*255)
+        for idx, mask in enumerate(result_masks):
+          kernel = np.ones((5,5), dtype=np.uint8)
+          mask = cv2.morphologyEx((mask*255).astype(np.uint8),cv2.MORPH_DILATE, kernel)
+          mask = mask_edge_smoothening(mask)
+          if idx == 0:
+            combined_mask = mask.copy()
+          else:
+            combined_mask[combined_mask==0] = mask[combined_mask==0]
+        cv2.imwrite(save_path, combined_mask)
+        # input('fetch')
         return result_masks
 
 def resize(orig_img_path, orig_mask_path, img_path, mask_path):
@@ -126,14 +157,14 @@ if __name__=='__main__':
   import os
 
   os.makedirs('input_dir2', exist_ok=True)
-  orig_img_path = '/home/ec2-user/stable-diffusion/stable-diffusion/tajmahal.jpg'
+  orig_img_path = 'workdir/billow926-12-Wc-Zgx6Y.png'
   detect = Detectobjects(orig_img_path)
-  det_path = '/home/ec2-user/stable-diffusion/stable-diffusion/tajmahal-detect.jpg'
+  det_path = 'workdir/billow926-12-Wc-Zgx6Y-detect.png'
   detect.save_predictions(det_path)
-  orig_mask_path = '/home/ec2-user/stable-diffusion/stable-diffusion/tajmahal_mask.jpg'
-  detect.fetch_predictions([0,4,1,5],orig_mask_path)
-  img_path = 'input_dir/tajmahal.png'
-  mask_path = 'input_dir/tajmahal_mask.png'
+  orig_mask_path = 'workdir/billow926-12-Wc-Zgx6Y_mask.png'
+  detect.fetch_predictions([7,2,5],orig_mask_path)
+  img_path = 'workdir/mask/billow926-12-Wc-Zgx6Y.png'
+  mask_path = 'workdir/mask/billow926-12-Wc-Zgx6Y_mask.png'
   resize(orig_img_path, orig_mask_path, img_path, mask_path)
 
 
